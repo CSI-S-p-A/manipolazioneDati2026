@@ -74,12 +74,73 @@ def main():
                 dtype=float,
             )
 
+            exportData = {}
+
             numberOfColumns = len(table.columns)
 
             if currentTestCount == 20:
                 print(table.columns.values)
 
-            test_checks.testCheck(test)
+            testType = test_checks.testCheck(test)
+
+            dataTime = table["Time"].copy()
+
+            if testType is not test_checks.TestType.LSS:
+                dataTTC = table["Time To Collision (Longitudinal)"]
+                [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
+            else:
+                print("TODO")
+                # here the startTestIndex and new time should be calculated for
+                # LSS from different sources, like the steering and the current position on the path
+
+            # START VUT PROCESS
+            #
+            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X POSITION OR WHATEVER
+            # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
+            exportData["10VEHC000000DSXP"] = table["X position"]
+            exportData["10VEHC000000DSYP"] = table["Y position"]
+
+            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y VELOCITY
+            # CHECK FOR UNIT OF MEASURE
+            exportData["10VEHC000000VEXP"] = table["Forward velocity"]
+            exportData["10VEHC000000VEYP"] = table["Lateral velocity"]
+
+            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y ACCELERATION OR WHATEVER
+            exportData["10VEHC000000ACXS"] = functions.filtering(
+                ["Forward acceleration"]
+            )
+            exportData["10VEHC000000ACYS"] = functions.filtering(
+                ["Lateral acceleration"]
+            )
+
+            exportData["10VEHC000000AVZP"] = functions.filtering(["Yaw velocity"])
+            exportData["10VEHC000000ANZP"] = table["Yaw angle"]
+
+            # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
+            exportData["11WHEL000000DSXP"] = table["X position"]
+            exportData["13WHEL000000DSYP"] = table["Y position"]
+            exportData["11WHEL000000DSXP"] = table["X position"]
+            exportData["13WHEL000000DSYP"] = table["Y position"]
+
+            exportData["10STWL000000AV1P"] = table["SR Velocity"]
+            exportData["10STWL000000AN1P"] = table["SR Angle"]
+            exportData["10STWL000000MO1P"] = functions.filtering(
+                ["SR Column Torque (estimated)"]
+            )
+
+            exportData["10PEAC000000DS0P"] = functions.processAcceleratorPosition(
+                table["BR position"]
+            )
+
+            exportData["10PEBR000000DS0P"] = functions.processBrakePosition(
+                table["BR position"]
+            )
+
+            exportData["10PEBR000000FO0P"] = table["Brake Force"]
+
+            currentPercentage = currentTestCount / nTests * 100
+            formattedPercentage = f"{currentPercentage:.2f}%"
+            print(formattedPercentage, "\t", relativePath, "was processed.")
 
         except Exception as e:
             failedFiles.append((relativePath, e))
