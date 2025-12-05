@@ -4,6 +4,7 @@ from io import StringIO
 
 import functions
 import test_checks
+from test_checks import TestType
 
 
 def main():
@@ -74,10 +75,6 @@ def main():
                 dtype=float,
             )
 
-            exportData = {}
-
-            numberOfColumns = len(table.columns)
-
             if currentTestCount == 20:
                 print(table.columns.values)
 
@@ -86,67 +83,132 @@ def main():
             dataTime = table["Time"].copy()
 
             if testType is not test_checks.TestType.LSS:
-                dataTTC = table["Time To Collision (Longitudinal)"]
+                dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
             else:
                 print("TODO")
                 # here the startTestIndex and new time should be calculated for
                 # LSS from different sources, like the steering and the current position on the path
 
-            # START VUT PROCESS
-            #
-            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X POSITION OR WHATEVER
-            # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
-            exportData["10VEHC000000DSXP"] = table["X position"]
-            exportData["10VEHC000000DSYP"] = table["Y position"]
+            exportData = {}
+            exportData = VUTProcess(table, exportData)
+            exportData = targetProcess(table, exportData, testType)
 
-            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y VELOCITY
-            # CHECK FOR UNIT OF MEASURE
-            exportData["10VEHC000000VEXP"] = table["Forward velocity"]
-            exportData["10VEHC000000VEYP"] = table["Lateral velocity"]
+            functions.exportingToChannelFolder(folderTest, exportData)
 
-            # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y ACCELERATION OR WHATEVER
-            exportData["10VEHC000000ACXS"] = functions.filtering(
-                ["Forward acceleration"]
-            )
-            exportData["10VEHC000000ACYS"] = functions.filtering(
-                ["Lateral acceleration"]
-            )
-
-            exportData["10VEHC000000AVZP"] = functions.filtering(["Yaw velocity"])
-            exportData["10VEHC000000ANZP"] = table["Yaw angle"]
-
-            # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
-            exportData["11WHEL000000DSXP"] = table["X position"]
-            exportData["13WHEL000000DSYP"] = table["Y position"]
-            exportData["11WHEL000000DSXP"] = table["X position"]
-            exportData["13WHEL000000DSYP"] = table["Y position"]
-
-            exportData["10STWL000000AV1P"] = table["SR Velocity"]
-            exportData["10STWL000000AN1P"] = table["SR Angle"]
-            exportData["10STWL000000MO1P"] = functions.filtering(
-                ["SR Column Torque (estimated)"]
-            )
-
-            exportData["10PEAC000000DS0P"] = functions.processAcceleratorPosition(
-                table["BR position"]
-            )
-
-            exportData["10PEBR000000DS0P"] = functions.processBrakePosition(
-                table["BR position"]
-            )
-
-            exportData["10PEBR000000FO0P"] = table["Brake Force"]
-
+            # Displaying the percentage
             currentPercentage = currentTestCount / nTests * 100
             formattedPercentage = f"{currentPercentage:.2f}%"
-            print(formattedPercentage, "\t", relativePath, "was processed.")
+            print(formattedPercentage, "\t", relativePath, " was processed.")
 
         except Exception as e:
             failedFiles.append((relativePath, e))
             errorMessage = "There was an error: " + str(e) + "\n"
-            errorMessage = errorMessage + relativePath + "was NOT processed"
+            errorMessage = errorMessage + relativePath + " was NOT processed"
             functions.decorateSentence(errorMessage, True)
+
+
+def timeProcess(table, exportData, startTestIndex, testType):
+    if not testType == TestType.DOOR and not testType == TestType.LSS:
+        exportData["10TFCW000000EV00"] = functions.warningProcess(
+            table["Time to collision (longitudinal)"], startTestIndex
+        )
+    elif testType == TestType.DOOR:
+        print("do stuff")
+    elif testType == TestType.LSS:
+        print("do other stuff")
+
+
+def VUTProcess(table, exportData):
+    # START VUT PROCESS
+    #
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X POSITION OR WHATEVER
+    # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
+    exportData["10VEHC000000DSXP"] = table["X position"].to_numpy()
+    exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy()
+
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y VELOCITY
+    # CHECK FOR UNIT OF MEASURE
+    exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
+    exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
+
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y ACCELERATION OR WHATEVER
+    exportData["10VEHC000000ACXS"] = functions.filtering(
+        table["Forward acceleration"].to_numpy()
+    )
+    exportData["10VEHC000000ACYS"] = functions.filtering(
+        table["Lateral acceleration"].to_numpy()
+    )
+
+    exportData["10VEHC000000AVZP"] = functions.filtering(
+        table["Yaw velocity"].to_numpy()
+    )
+    exportData["10VEHC000000ANZP"] = table["Yaw angle"].to_numpy()
+
+    # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
+    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy()
+    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy()
+    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy()
+    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy()
+
+    exportData["10STWL000000AV1P"] = table["SR Velocity"]
+    exportData["10STWL000000AN1P"] = table["SR Angle"]
+    exportData["10STWL000000MO1P"] = functions.filtering(
+        table["SR Column Torque (Estimated)"].to_numpy()
+    )
+
+    exportData["10PEAC000000DS0P"] = functions.processAcceleratorPosition(
+        table["BR Position"].to_numpy()
+    )
+
+    exportData["10PEBR000000DS0P"] = functions.processBrakePosition(
+        table["BR Position"].to_numpy()
+    )
+
+    exportData["10PEBR000000FO0P"] = table["Brake force (unfiltered)"].to_numpy()
+
+    return exportData
+
+
+def targetProcess(table, exportData, testType):
+    # TODO CHANGE THE LSS STUFF THE REST SHOULD BE FINE
+    TARGET_CODE = {
+        TestType.LSS: "VEHC",
+        TestType.C2C: "VEHC",
+        TestType.C2M: "TWMB",
+        TestType.C2B: "CYCL",
+        TestType.DOOR: "CYCL",
+        TestType.C2PA: "PEDA",
+        TestType.C2PC: "PEDC",
+    }
+
+    exportData[f"20{TARGET_CODE[testType]}000000DSXP"] = table[
+        "Target reference X position"
+    ].to_numpy()
+
+    exportData[f"20{TARGET_CODE[testType]}000000DSYP"] = table[
+        "Target reference Y position"
+    ].to_numpy()
+
+    exportData[f"20{TARGET_CODE[testType]}000000VEXP"] = table[
+        "Target forward velocity"
+    ].to_numpy()
+
+    exportData[f"20{TARGET_CODE[testType]}000000VEYP"] = table[
+        "Target lateral velocity"
+    ].to_numpy()
+
+    exportData[f"20{TARGET_CODE[testType]}000000ACXS"] = functions.filtering(
+        table["Target forward acceleration"].to_numpy()
+    )
+
+    exportData[f"20{TARGET_CODE[testType]}000000ANZS"] = table["Target yaw"].to_numpy()
+
+    exportData[f"20{TARGET_CODE[testType]}000000AVZP"] = functions.filtering(
+        table["Target yaw velocity"].to_numpy()
+    )
+
+    return exportData
 
 
 if __name__ == "__main__":

@@ -131,16 +131,50 @@ def warningProcess(warningVector, startTestIndex):
 
 
 def processAcceleratorPosition(dataVector):
-    for item in dataVector:
-        if item > 0:
-            item = 0
+    import numpy as np
 
-    return dataVector.abs()
+    dataVector = np.where(dataVector > 0, 0, dataVector)
+    return np.abs(dataVector)
 
 
 def processBrakePosition(dataVector):
-    for item in dataVector:
-        if item < 0:
-            item = 0
+    import numpy as np
 
-    return dataVector.abs()
+    dataVector = np.where(dataVector < 0, 0, dataVector)
+    return np.abs(dataVector)
+
+
+def exportingToChannelFolder(testDirectory, output):
+    import numpy as np
+
+    channelFolder = os.path.join(testDirectory, "Channel")
+    os.makedirs(channelFolder, exist_ok=True)
+    numberOfChannels = len(output)
+
+    count = 1
+
+    with open(os.path.join(channelFolder, "data.chn"), "w") as file:
+        file.write("Instrumentation standard    :ISO 6487 :1987\n")
+        file.write("Number of channels          :" + str(numberOfChannels) + "\n")
+
+    # print(output)
+
+    for channelName, dataVector in output.items():
+        currentChannelNumber = str(count).zfill(3)
+
+        with open(os.path.join(channelFolder, "data.chn"), "a") as file:
+            file.write(
+                "Name of channel "
+                + currentChannelNumber
+                + "         :"
+                + channelName
+                + "\n"
+            )
+
+        np.savetxt(
+            os.path.join(channelFolder, "data." + currentChannelNumber),
+            dataVector,
+            fmt="%.8f",
+        )
+
+        count = count + 1
