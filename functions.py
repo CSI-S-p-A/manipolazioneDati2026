@@ -130,6 +130,30 @@ def warningProcess(warningVector, startTestIndex):
     return warningOut
 
 
+def yawVelocityProcess(yawVelocity, startTestIndex):
+    import pandas as pd
+
+    curveTime = pd.Series(filtering(yawVelocity)).copy()
+    curveTime[:] = 0
+    yawVelocityPositive = pd.Series(yawVelocity).copy().abs()
+
+    warningThreshold = 1.5
+
+    indexFirstWarning = yawVelocityPositive.iloc[startTestIndex:][
+        yawVelocityPositive.iloc[startTestIndex:] > warningThreshold
+    ].index.tolist()
+
+    print(len(indexFirstWarning))
+
+    print("first print")
+    print(indexFirstWarning)
+
+    if len(indexFirstWarning) != 0:
+        curveTime[indexFirstWarning[0] :] = 5
+
+    return curveTime.to_numpy()
+
+
 def processAcceleratorPosition(dataVector):
     import numpy as np
 

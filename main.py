@@ -86,12 +86,14 @@ def main():
                 dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
             else:
+                startTestIndex = 0
                 print("TODO")
-                # here the startTestIndex and new time should be calculated for
+                # TODO here the startTestIndex and new time should be calculated for
                 # LSS from different sources, like the steering and the current position on the path
 
             exportData = {}
-            exportData = VUTProcess(table, exportData)
+            exportData = timeProcess(table, exportData, startTestIndex, testType, test)
+            exportData = VUTProcess(table, exportData, testType)
             exportData = targetProcess(table, exportData, testType)
 
             functions.exportingToChannelFolder(folderTest, exportData)
@@ -108,18 +110,38 @@ def main():
             functions.decorateSentence(errorMessage, True)
 
 
-def timeProcess(table, exportData, startTestIndex, testType):
+def timeProcess(table, exportData, startTestIndex, testType, test):
     if not testType == TestType.DOOR and not testType == TestType.LSS:
         exportData["10TFCW000000EV00"] = functions.warningProcess(
-            table["Time to collision (longitudinal)"], startTestIndex
+            table["ADC6"], startTestIndex
+        )
+        exportData["10TECS000000EV00"] = functions.yawVelocityProcess(
+            table["Yaw velocity"], startTestIndex
         )
     elif testType == TestType.DOOR:
-        print("do stuff")
+        exportData["10TWRN000000EV00"] = functions.warningProcess(
+            table["ADC6"], startTestIndex
+        )
+        # I've assumed the ADC7 for the external trigger for the door opening, just use a reference one
+        exportData["10TDOP000000EV00"] = functions.warningProcess(
+            table["ADC7"], startTestIndex
+        )
+        # TODO make the user insert the correct time where it did the visual signal
     elif testType == TestType.LSS:
-        print("do other stuff")
+        testFolder = os.path.dirname(test)
+        ldwDirectory = os.path.join(testFolder, "ldw.ini")
+        if os.path.exists(ldwDirectory):
+            print("do something")
+        else:
+            # TODO WARN THE USER THAT I'M SEARCHING THE LDW IN THE FCW WARINGS
+            exportData["10TLDW000000EV00"] = functions.warningProcess(
+                table["ADC6"], startTestIndex
+            )
+
+    return exportData
 
 
-def VUTProcess(table, exportData):
+def VUTProcess(table, exportData, testType):
     # START VUT PROCESS
     #
     # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X POSITION OR WHATEVER
