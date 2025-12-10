@@ -37,6 +37,8 @@ def decorateSentence(sentence: str, isRed: bool):
     init()
     if isRed:
         print(Fore.RED)
+    else:
+        print(Fore.YELLOW)
     print(
         "---------------------------------------------------------------------------------"
     )
@@ -202,3 +204,15 @@ def exportingToChannelFolder(testDirectory, output):
         )
 
         count = count + 1
+
+
+def externalTimeProcess(timeValue, table):
+    import numpy as np
+
+    outputVector = table["Time"].copy()
+    outputVector[:] = 0
+
+    idx = np.abs(table["Time"].to_numpy() - timeValue).argmin()
+
+    outputVector[idx:] = 5
+    return outputVector.to_numpy()

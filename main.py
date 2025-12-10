@@ -86,7 +86,7 @@ def main():
                 dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
             else:
-                startTestIndex = 0
+                startTestIndex = 500
                 print("TODO")
                 # TODO here the startTestIndex and new time should be calculated for
                 # LSS from different sources, like the steering and the current position on the path
@@ -129,11 +129,20 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
         # TODO make the user insert the correct time where it did the visual signal
     elif testType == TestType.LSS:
         testFolder = os.path.dirname(test)
-        ldwDirectory = os.path.join(testFolder, "ldw.ini")
-        if os.path.exists(ldwDirectory):
-            print("do something")
+        ldwFile = os.path.join(testFolder, "ldw.ini")
+        if os.path.exists(ldwFile):
+            with open(ldwFile, "r") as file:
+                ldwValue = file.readline()
+            ldwValue = float(ldwValue)
+            print(f"ldw.ini was found, the value is: {ldwValue}")
+            exportData["10TLDW000000EV00"] = functions.externalTimeProcess(
+                ldwValue, table
+            )
         else:
-            # TODO WARN THE USER THAT I'M SEARCHING THE LDW IN THE FCW WARINGS
+            functions.decorateSentence(
+                "Warning: no ldw.ini file found. Processing the LDW from the ADC6 channel.",
+                False,
+            )
             exportData["10TLDW000000EV00"] = functions.warningProcess(
                 table["ADC6"], startTestIndex
             )
@@ -144,12 +153,15 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
 def VUTProcess(table, exportData, testType):
     # START VUT PROCESS
     #
-    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X POSITION OR WHATEVER
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
     # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
-    exportData["10VEHC000000DSXP"] = table["X position"].to_numpy()
-    exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy()
+    offsetX = 0
+    offsetY = 0
 
-    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y VELOCITY
+    exportData["10VEHC000000DSXP"] = table["X position"].to_numpy() + offsetX
+    exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy() + offsetY
+
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X,Y VELOCITY
     # CHECK FOR UNIT OF MEASURE
     exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
     exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
@@ -168,10 +180,10 @@ def VUTProcess(table, exportData, testType):
     exportData["10VEHC000000ANZP"] = table["Yaw angle"].to_numpy()
 
     # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
-    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy()
-    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy()
-    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy()
-    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy()
+    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
+    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy() + offsetY
+    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
+    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy() + offsetY
 
     exportData["10STWL000000AV1P"] = table["SR Velocity"]
     exportData["10STWL000000AN1P"] = table["SR Angle"]
@@ -195,7 +207,7 @@ def VUTProcess(table, exportData, testType):
 def targetProcess(table, exportData, testType):
     # TODO CHANGE THE LSS STUFF THE REST SHOULD BE FINE
     TARGET_CODE = {
-        TestType.LSS: "VEHC",
+        TestType.LSS: "VEHC",  # Change this
         TestType.C2C: "VEHC",
         TestType.C2M: "TWMB",
         TestType.C2B: "CYCL",
