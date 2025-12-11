@@ -126,7 +126,18 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
         exportData["10TDOP000000EV00"] = functions.warningProcess(
             table["ADC7"], startTestIndex
         )
-        # TODO make the user insert the correct time where it did the visual signal
+        testFolder = os.path.dirname(test)
+        visualFile = os.path.join(testFolder, "visual.ini")
+        if os.path.exists(visualFile):
+            with open(visualFile, "r") as file:
+                visualValue = file.readline()
+            visualValue = float(visualValue)
+            print(f"visual.ini was found, the value is: {visualValue}")
+            exportData["10TINF000000EV00"] = functions.externalTimeProcess(
+                visualValue, table
+            )
+        else:
+            raise ValueError("No visual.ini file was found for the dooring test.")
     elif testType == TestType.LSS:
         testFolder = os.path.dirname(test)
         ldwFile = os.path.join(testFolder, "ldw.ini")
@@ -205,7 +216,7 @@ def VUTProcess(table, exportData, testType):
 
 
 def targetProcess(table, exportData, testType):
-    # TODO CHANGE THE LSS STUFF THE REST SHOULD BE FINE
+    # TODO CHANGE THE LSS PROCESS
     TARGET_CODE = {
         TestType.LSS: "VEHC",  # Change this
         TestType.C2C: "VEHC",
@@ -216,6 +227,7 @@ def targetProcess(table, exportData, testType):
         TestType.C2PC: "PEDC",
     }
 
+    # TODO CHANGE THE SYSTEM OF REFERENCE
     exportData[f"20{TARGET_CODE[testType]}000000DSXP"] = table[
         "Target reference X position"
     ].to_numpy()
