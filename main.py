@@ -93,7 +93,7 @@ def main():
 
             exportData = {}
             exportData = timeProcess(table, exportData, startTestIndex, testType, test)
-            exportData = VUTProcess(table, exportData, testType)
+            exportData = VUTProcess(table, exportData, testType, folderTest)
             exportData = targetProcess(table, exportData, testType)
 
             functions.exportingToChannelFolder(folderTest, exportData)
@@ -161,13 +161,27 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
     return exportData
 
 
-def VUTProcess(table, exportData, testType):
+def VUTProcess(table, exportData, testType: TestType, folderTest):
     # START VUT PROCESS
     #
     # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
     # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
     offsetX = 0
     offsetY = 0
+
+    # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
+    match testType:
+        case TestType.LSS:
+            lineFolder = os.path.dirname(folderTest)
+            zeroFile = os.path.join(lineFolder, "zero.ini")
+
+            if not os.path.isfile(zeroFile):
+                raise Exception("No zero.ini file was found.")
+
+            with open(zeroFile, "r") as file:
+                zero = file.readline()
+
+            offsetY = -float(zero)
 
     exportData["10VEHC000000DSXP"] = table["X position"].to_numpy() + offsetX
     exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy() + offsetY
