@@ -2,8 +2,6 @@ import os
 
 from colorama import Fore, Style, init
 
-from test_checks import TestType
-
 
 def getFolder():
     from tkinter import Tk
@@ -28,7 +26,6 @@ def loadPandas():
 
 
 def testCheck(test: str) -> bool:
-    testFolder = os.path.dirname(test)
     specPath = test.replace(".txt", ".spec")
     return os.path.exists(specPath)
 
@@ -160,6 +157,7 @@ def processAcceleratorPosition(dataVector):
     import numpy as np
 
     dataVector = np.where(dataVector > 0, 0, dataVector)
+    dataVector = dataVector / 1000.0
     return np.abs(dataVector)
 
 
@@ -167,6 +165,7 @@ def processBrakePosition(dataVector):
     import numpy as np
 
     dataVector = np.where(dataVector < 0, 0, dataVector)
+    dataVector = dataVector / 1000.0
     return np.abs(dataVector)
 
 

@@ -93,16 +93,17 @@ def main():
                 dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
             else:
-                startTestIndex = 500
-                print("TODO")
                 # TODO here the startTestIndex and new time should be calculated for
                 # LSS from different sources, like the steering and the current position on the path
+                startTestIndex = 500
 
+            # Filling the channels
             exportData = {}
             timeProcess(table, exportData, startTestIndex, testType, test)
             VUTProcess(table, exportData, testType, folderTest)
             targetProcess(table, exportData, testType)
 
+            # Outputing the data to the channel files
             functions.exportingToChannelFolder(folderTest, exportData)
 
             # Displaying the percentage
@@ -170,6 +171,8 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
 
 # KEEP FIXING THIS PLEASE
 def VUTProcess(table, exportData, testType: List[TestType], folderTest):
+    import numpy as np
+
     # START VUT PROCESS
     #
     # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
@@ -208,10 +211,13 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
         table["Lateral acceleration"].to_numpy()
     )
 
-    exportData["10VEHC000000AVZP"] = functions.filtering(
-        table["Yaw velocity"].to_numpy()
+    vut_yaw_velocity = (
+        functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
     )
-    exportData["10VEHC000000ANZP"] = table["Yaw angle"].to_numpy()
+    vut_yaw_angle = table["Yaw angle"].to_numpy() * np.pi / 180
+
+    exportData["10VEHC000000AVZP"] = vut_yaw_velocity
+    exportData["10VEHC000000ANZP"] = vut_yaw_angle
 
     # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
     exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
@@ -219,8 +225,12 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
     exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy() + offsetY
 
-    exportData["10STWL000000AV1P"] = table["SR Velocity"]
-    exportData["10STWL000000AN1P"] = table["SR Angle"]
+    sr_velocity = table["SR Velocity"] * np.pi / 180
+    sr_angle = table["SR Angle"] * np.pi / 180
+
+    exportData["10STWL000000AV1P"] = sr_velocity
+    exportData["10STWL000000AN1P"] = sr_angle
+
     exportData["10STWL000000MO1P"] = functions.filtering(
         table["SR Column Torque (Estimated)"].to_numpy()
     )
@@ -237,6 +247,8 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
 
 
 def targetProcess(table, exportData, testType):
+    import numpy as np
+
     # TODO CHANGE THE LSS PROCESS
     TARGET_CODE = {
         TestType.C2C: "VEHC",
@@ -278,11 +290,14 @@ def targetProcess(table, exportData, testType):
         table["Target forward acceleration"].to_numpy()
     )
 
-    exportData[f"20{TARGET_CODE[testType]}000000ANZS"] = table["Target yaw"].to_numpy()
-
-    exportData[f"20{TARGET_CODE[testType]}000000AVZP"] = functions.filtering(
-        table["Target yaw velocity"].to_numpy()
+    # Convert Yaw to rad
+    target_yaw = table["Target yaw"].to_numpy() * np.pi / 180
+    target_yaw_velocity = (
+        functions.filtering(table["Target yaw velocity"].to_numpy()) * np.pi / 180
     )
+
+    exportData[f"20{TARGET_CODE[testType]}000000ANZS"] = target_yaw
+    exportData[f"20{TARGET_CODE[testType]}000000AVZP"] = target_yaw_velocity
 
 
 if __name__ == "__main__":
