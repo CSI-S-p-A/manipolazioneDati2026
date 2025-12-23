@@ -1,6 +1,7 @@
 import os
 import shutil
 from io import StringIO
+from typing import List
 
 import functions
 import test_checks
@@ -75,6 +76,12 @@ def main():
                 dtype=float,
             )
 
+            index_ADC5 = table.columns.get_loc("ADC5")
+            if type(index_ADC5) is int:
+                table.rename(
+                    columns={table.columns[index_ADC5 + 1]: "ADC6"}, inplace=True
+                )
+
             if currentTestCount == 20:
                 print(table.columns.values)
 
@@ -82,7 +89,7 @@ def main():
 
             dataTime = table["Time"].copy()
 
-            if testType is not test_checks.TestType.LSS:
+            if test_checks.TestType.LSS not in testType:
                 dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
             else:
@@ -92,9 +99,9 @@ def main():
                 # LSS from different sources, like the steering and the current position on the path
 
             exportData = {}
-            exportData = timeProcess(table, exportData, startTestIndex, testType, test)
-            exportData = VUTProcess(table, exportData, testType, folderTest)
-            exportData = targetProcess(table, exportData, testType)
+            timeProcess(table, exportData, startTestIndex, testType, test)
+            VUTProcess(table, exportData, testType, folderTest)
+            targetProcess(table, exportData, testType)
 
             functions.exportingToChannelFolder(folderTest, exportData)
 
@@ -111,14 +118,15 @@ def main():
 
 
 def timeProcess(table, exportData, startTestIndex, testType, test):
-    if not testType == TestType.DOOR and not testType == TestType.LSS:
+    if TestType.DOOR not in testType and TestType.LSS not in testType:
         exportData["10TFCW000000EV00"] = functions.warningProcess(
             table["ADC6"], startTestIndex
         )
         exportData["10TECS000000EV00"] = functions.yawVelocityProcess(
             table["Yaw velocity"], startTestIndex
         )
-    elif testType == TestType.DOOR:
+
+    elif TestType.DOOR in testType:
         exportData["10TWRN000000EV00"] = functions.warningProcess(
             table["ADC6"], startTestIndex
         )
@@ -138,7 +146,8 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
             )
         else:
             raise ValueError("No visual.ini file was found for the dooring test.")
-    elif testType == TestType.LSS:
+
+    elif TestType.LSS in testType:
         testFolder = os.path.dirname(test)
         ldwFile = os.path.join(testFolder, "ldw.ini")
         if os.path.exists(ldwFile):
@@ -158,10 +167,9 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
                 table["ADC6"], startTestIndex
             )
 
-    return exportData
 
-
-def VUTProcess(table, exportData, testType: TestType, folderTest):
+# KEEP FIXING THIS PLEASE
+def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     # START VUT PROCESS
     #
     # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
@@ -170,18 +178,19 @@ def VUTProcess(table, exportData, testType: TestType, folderTest):
     offsetY = 0
 
     # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
-    match testType:
-        case TestType.LSS:
-            lineFolder = os.path.dirname(folderTest)
-            zeroFile = os.path.join(lineFolder, "zero.ini")
+    for t in testType:
+        match t:
+            case TestType.LSS:
+                lineFolder = os.path.dirname(folderTest)
+                zeroFile = os.path.join(lineFolder, "zero.ini")
 
-            if not os.path.isfile(zeroFile):
-                raise Exception("No zero.ini file was found.")
+                if not os.path.isfile(zeroFile):
+                    raise Exception("No zero.ini file was found.")
 
-            with open(zeroFile, "r") as file:
-                zero = file.readline()
+                with open(zeroFile, "r") as file:
+                    zero = file.readline()
 
-            offsetY = -float(zero)
+                offsetY = -float(zero)
 
     exportData["10VEHC000000DSXP"] = table["X position"].to_numpy() + offsetX
     exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy() + offsetY
@@ -226,13 +235,10 @@ def VUTProcess(table, exportData, testType: TestType, folderTest):
 
     exportData["10PEBR000000FO0P"] = table["Brake force (unfiltered)"].to_numpy()
 
-    return exportData
-
 
 def targetProcess(table, exportData, testType):
     # TODO CHANGE THE LSS PROCESS
     TARGET_CODE = {
-        TestType.LSS: "VEHC",  # Change this
         TestType.C2C: "VEHC",
         TestType.C2M: "TWMB",
         TestType.C2B: "CYCL",
@@ -241,7 +247,17 @@ def targetProcess(table, exportData, testType):
         TestType.C2PC: "PEDC",
     }
 
-    # TODO CHANGE THE SYSTEM OF REFERENCE
+    test = []
+    for t in testType:
+        if t in TARGET_CODE:
+            test = t
+            break
+
+    if not test:
+        return
+
+    # TODO CHANGE THE SYSTEM OF REFERENCE IF NEEDED
+
     exportData[f"20{TARGET_CODE[testType]}000000DSXP"] = table[
         "Target reference X position"
     ].to_numpy()
@@ -267,8 +283,6 @@ def targetProcess(table, exportData, testType):
     exportData[f"20{TARGET_CODE[testType]}000000AVZP"] = functions.filtering(
         table["Target yaw velocity"].to_numpy()
     )
-
-    return exportData
 
 
 if __name__ == "__main__":
