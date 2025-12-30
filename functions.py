@@ -215,3 +215,69 @@ def externalTimeProcess(timeValue, table):
 
     outputVector[idx:] = 5
     return outputVector.to_numpy()
+
+
+def reference_system_change(yaw_angle, x_position, y_position, x_imu, y_imu):
+    import numpy as np
+
+    N = x_position.shape[0]
+    T_imupar_ext = np.zeros((N, 3, 3))
+
+    T_imupar_ext[:, 0, 0] = 1
+    T_imupar_ext[:, 1, 1] = 1
+    T_imupar_ext[:, 2, 2] = 1
+
+    T_imupar_ext[:, 0, 2] = x_position
+    T_imupar_ext[:, 1, 2] = y_position
+
+    T_imu_imupar = np.zeros((N, 3, 3))
+
+    T_imu_imupar[:, 0, 0] = np.cos(yaw_angle)
+    T_imu_imupar[:, 0, 1] = -np.sin(yaw_angle)
+    T_imu_imupar[:, 1, 0] = np.sin(yaw_angle)
+    T_imu_imupar[:, 1, 1] = np.cos(yaw_angle)
+
+    T_imu_imupar[:, 2, 2] = 1
+
+    T_vut_imu = np.zeros((N, 3, 3))
+
+    T_vut_imu[:, 0, 0] = 1
+    T_vut_imu[:, 1, 1] = 1
+    T_vut_imu[:, 2, 2] = 1
+
+    T_vut_imu[:, 0, 2] = -x_imu
+    T_vut_imu[:, 1, 2] = -y_imu
+
+    T = T_imupar_ext @ T_imu_imupar @ T_vut_imu
+    # T = T_imupar_ext @ T_vut_imu
+
+    return T
+
+
+def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
+    import numpy as np
+
+    N = x_position.shape[0]
+    T_imu_ext = np.zeros((N, 3, 3))
+
+    T_imu_ext[:, 0, 0] = np.cos(yaw_angle)
+    T_imu_ext[:, 0, 1] = -np.sin(yaw_angle)
+    T_imu_ext[:, 1, 0] = np.sin(yaw_angle)
+    T_imu_ext[:, 1, 1] = np.cos(yaw_angle)
+
+    T_imu_ext[:, 0, 2] = x_position
+    T_imu_ext[:, 1, 2] = y_position
+    T_imu_ext[:, 2, 2] = 1
+
+    T_vut_imu = np.zeros((N, 3, 3))
+
+    T_vut_imu[:, 0, 0] = 1
+    T_vut_imu[:, 1, 1] = 1
+    T_vut_imu[:, 2, 2] = 1
+
+    T_vut_imu[:, 0, 2] = -x_imu
+    T_vut_imu[:, 1, 2] = -y_imu
+
+    T = T_imu_ext @ T_vut_imu
+
+    return T

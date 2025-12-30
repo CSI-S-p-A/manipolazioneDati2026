@@ -180,6 +180,10 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     offsetX = 0
     offsetY = 0
 
+    overhang = 0.83
+    width = 1.90
+    x_imu = -2.01
+    y_imu = 0
     # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
     for t in testType:
         match t:
@@ -193,13 +197,32 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
                 with open(zeroFile, "r") as file:
                     zero = file.readline()
 
-                offsetY = -float(zero)
+                offsetY = -float(zero) + width / 2
 
-    exportData["10VEHC000000DSXP"] = table["X position"].to_numpy() + offsetX
-    exportData["10VEHC000000DSYP"] = table["Y position"].to_numpy() + offsetY
+    vut_yaw_velocity = (
+        functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
+    )
+    vut_yaw_angle = table["Yaw angle"].to_numpy() * np.pi / 180
 
-    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X,Y VELOCITY
-    # CHECK FOR UNIT OF MEASURE
+    x_position = table["X position"].to_numpy()
+    y_position = table["Y position"].to_numpy()
+
+    A = np.array([[overhang], [0], [1]])
+
+    B = np.array([[0], [width / 2], [1]])
+    C = np.array([[0], [-width / 2], [1]])
+
+    T_tot = functions.reference_system_change(
+        vut_yaw_angle, x_position, y_position, x_imu, y_imu
+    )
+
+    A_new = T_tot @ A
+    B_new = T_tot @ B
+    C_new = T_tot @ C
+
+    exportData["10VEHC000000DSXP"] = A_new[:, 0, 0] + offsetX
+    exportData["10VEHC000000DSYP"] = A_new[:, 1, 0] + offsetY
+
     exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
     exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
 
@@ -211,19 +234,14 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
         table["Lateral acceleration"].to_numpy()
     )
 
-    vut_yaw_velocity = (
-        functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
-    )
-    vut_yaw_angle = table["Yaw angle"].to_numpy() * np.pi / 180
-
     exportData["10VEHC000000AVZP"] = vut_yaw_velocity
     exportData["10VEHC000000ANZP"] = vut_yaw_angle
 
     # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
-    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
-    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy() + offsetY
-    exportData["11WHEL000000DSXP"] = table["X position"].to_numpy() + offsetX
-    exportData["13WHEL000000DSYP"] = table["Y position"].to_numpy() + offsetY
+    exportData["11WHEL000000DSXP"] = B_new[:, 0, 0] + offsetX
+    exportData["11WHEL000000DSYP"] = B_new[:, 1, 0] + offsetY
+    exportData["13WHEL000000DSXP"] = C_new[:, 0, 0] + offsetX
+    exportData["13WHEL000000DSYP"] = C_new[:, 1, 0] + offsetY
 
     sr_velocity = table["SR Velocity"] * np.pi / 180
     sr_angle = table["SR Angle"] * np.pi / 180
