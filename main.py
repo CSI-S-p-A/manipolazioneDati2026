@@ -4,6 +4,7 @@ from io import StringIO
 from typing import List
 
 import functions
+import plotting
 import test_checks
 from test_checks import TestType
 
@@ -101,6 +102,21 @@ def main():
             exportData = {}
             timeProcess(table, exportData, startTestIndex, testType, test)
             VUTProcess(table, exportData, testType, folderTest)
+
+            print(exportData["10VEHC000000DSXP"])
+
+            if currentTestCount == 1:
+                plotting.animation_3_points(
+                    exportData["10VEHC000000DSXP"],
+                    exportData["10VEHC000000DSYP"],
+                    exportData["11WHEL000000DSXP"],
+                    exportData["11WHEL000000DSYP"],
+                    exportData["13WHEL000000DSXP"],
+                    exportData["13WHEL000000DSYP"],
+                    table["X position"].to_numpy(),
+                    table["Y position"].to_numpy(),
+                )
+
             targetProcess(table, exportData, testType)
 
             # Outputing the data to the channel files
@@ -180,10 +196,11 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     offsetX = 0
     offsetY = 0
 
-    overhang = 0.83
+    overhang = 4.83
     width = 1.90
     x_imu = -2.01
     y_imu = 0
+
     # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
     for t in testType:
         match t:
@@ -198,6 +215,7 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
                     zero = file.readline()
 
                 offsetY = -float(zero) + width / 2
+                offsetY = 0.0
 
     vut_yaw_velocity = (
         functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
@@ -216,9 +234,21 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
         vut_yaw_angle, x_position, y_position, x_imu, y_imu
     )
 
+    T_tot_2 = functions.reference_system_change_2(
+        vut_yaw_angle, x_position, y_position, x_imu, y_imu
+    )
+
     A_new = T_tot @ A
     B_new = T_tot @ B
     C_new = T_tot @ C
+
+    A[0:2] = -A[0:2]
+    B[0:2] = -B[0:2]
+    C[0:2] = -C[0:2]
+
+    A_new = T_tot_2 @ A
+    B_new = T_tot_2 @ B
+    C_new = T_tot_2 @ C
 
     exportData["10VEHC000000DSXP"] = A_new[:, 0, 0] + offsetX
     exportData["10VEHC000000DSYP"] = A_new[:, 1, 0] + offsetY
@@ -226,7 +256,6 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
     exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
 
-    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE A X,Y ACCELERATION OR WHATEVER
     exportData["10VEHC000000ACXS"] = functions.filtering(
         table["Forward acceleration"].to_numpy()
     )

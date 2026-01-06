@@ -254,16 +254,20 @@ def reference_system_change(yaw_angle, x_position, y_position, x_imu, y_imu):
     return T
 
 
-def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
+def reference_system_change_3(yaw_angle, x_position, y_position, x_imu, y_imu):
     import numpy as np
 
     N = x_position.shape[0]
     T_imu_ext = np.zeros((N, 3, 3))
 
-    T_imu_ext[:, 0, 0] = np.cos(yaw_angle)
-    T_imu_ext[:, 0, 1] = -np.sin(yaw_angle)
-    T_imu_ext[:, 1, 0] = np.sin(yaw_angle)
-    T_imu_ext[:, 1, 1] = np.cos(yaw_angle)
+    angle = yaw_angle * 0 + 30 * np.pi / 180 + np.pi
+
+    print(f"X posistion: {x_position[0]}")
+
+    T_imu_ext[:, 0, 0] = np.cos(angle)
+    T_imu_ext[:, 0, 1] = -np.sin(angle)
+    T_imu_ext[:, 1, 0] = np.sin(angle)
+    T_imu_ext[:, 1, 1] = np.cos(angle)
 
     T_imu_ext[:, 0, 2] = x_position
     T_imu_ext[:, 1, 2] = y_position
@@ -279,5 +283,29 @@ def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
     T_vut_imu[:, 1, 2] = -y_imu
 
     T = T_imu_ext @ T_vut_imu
+
+    return T
+
+
+def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
+    import numpy as np
+
+    N = x_position.shape[0]
+    angle = yaw_angle * 0 + 30 * np.pi / 180 + np.pi
+
+    # Single transformation matrix: Rotate then Translate
+    T = np.zeros((N, 3, 3))
+
+    # Rotation part
+    T[:, 0, 0] = np.cos(angle)
+    T[:, 0, 1] = -np.sin(angle)
+    T[:, 1, 0] = np.sin(angle)
+    T[:, 1, 1] = np.cos(angle)
+    T[:, 2, 2] = 1
+
+    # Translation part:
+    # external_position - rotated_IMU_offset
+    T[:, 0, 2] = x_position - (x_imu * np.cos(angle) - y_imu * np.sin(angle))
+    T[:, 1, 2] = y_position - (x_imu * np.sin(angle) + y_imu * np.cos(angle))
 
     return T
