@@ -106,7 +106,8 @@ def main():
             print(exportData["10VEHC000000DSXP"])
 
             if currentTestCount == 1:
-                plotting.animation_3_points(
+                #                plotting.animation_3_points(
+                plotting.animate_car_frame(
                     exportData["10VEHC000000DSXP"],
                     exportData["10VEHC000000DSYP"],
                     exportData["11WHEL000000DSXP"],
@@ -196,10 +197,10 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     offsetX = 0
     offsetY = 0
 
-    overhang = 4.83
-    width = 1.90
-    x_imu = -2.01
-    y_imu = 0
+    overhang = 2
+    width = 2
+    x_imu = 3
+    y_imu = 0.1
 
     # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
     for t in testType:
@@ -234,13 +235,13 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
         vut_yaw_angle, x_position, y_position, x_imu, y_imu
     )
 
-    T_tot_2 = functions.reference_system_change_2(
+    T_tot_2 = functions.reference_system_change_3(
         vut_yaw_angle, x_position, y_position, x_imu, y_imu
     )
 
-    A_new = T_tot @ A
-    B_new = T_tot @ B
-    C_new = T_tot @ C
+    # A_new = T_tot @ A
+    # B_new = T_tot @ B
+    # C_new = T_tot @ C
 
     A[0:2] = -A[0:2]
     B[0:2] = -B[0:2]
@@ -271,6 +272,95 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["11WHEL000000DSYP"] = B_new[:, 1, 0] + offsetY
     exportData["13WHEL000000DSXP"] = C_new[:, 0, 0] + offsetX
     exportData["13WHEL000000DSYP"] = C_new[:, 1, 0] + offsetY
+
+    sr_velocity = table["SR Velocity"] * np.pi / 180
+    sr_angle = table["SR Angle"] * np.pi / 180
+
+    exportData["10STWL000000AV1P"] = sr_velocity
+    exportData["10STWL000000AN1P"] = sr_angle
+
+    exportData["10STWL000000MO1P"] = functions.filtering(
+        table["SR Column Torque (Estimated)"].to_numpy()
+    )
+
+    exportData["10PEAC000000DS0P"] = functions.processAcceleratorPosition(
+        table["BR Position"].to_numpy()
+    )
+
+    exportData["10PEBR000000DS0P"] = functions.processBrakePosition(
+        table["BR Position"].to_numpy()
+    )
+
+    exportData["10PEBR000000FO0P"] = table["Brake force (unfiltered)"].to_numpy()
+
+
+def VUTProcess_2(table, exportData, testType: List[TestType], folderTest):
+    import numpy as np
+
+    # START VUT PROCESS
+    #
+    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
+    # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
+    offsetX = 0
+    offsetY = 0
+
+    overhang = 2
+    width = 2
+    x_imu = 3
+    y_imu = 0.1
+
+    # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
+    for t in testType:
+        match t:
+            case TestType.LSS:
+                lineFolder = os.path.dirname(folderTest)
+                zeroFile = os.path.join(lineFolder, "zero.ini")
+
+                if not os.path.isfile(zeroFile):
+                    raise Exception("No zero.ini file was found.")
+
+                with open(zeroFile, "r") as file:
+                    zero = file.readline()
+
+                offsetY = -float(zero) + width / 2
+                offsetY = 0.0
+
+    vut_yaw_velocity = (
+        functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
+    )
+    vut_yaw_angle = table["Yaw angle"].to_numpy() * np.pi / 180
+
+    # CAMBIARE QUEASTO
+    vut_yaw_angle = vut_yaw_angle * 0 + 15 * np.pi / 180
+
+    x_position = table["X position"].to_numpy()
+    y_position = table["Y position"].to_numpy()
+
+    A = functions.calculate_A(x_imu, y_imu, overhang, vut_yaw_angle)
+    B = functions.calculate_B(x_imu, y_imu, width, vut_yaw_angle)
+    C = functions.calculate_C(x_imu, y_imu, width, vut_yaw_angle)
+
+    exportData["10VEHC000000DSXP"] = x_position + A[0] * np.cos(A[1])
+    exportData["10VEHC000000DSYP"] = y_position + A[0] * np.sin(A[1])
+
+    exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
+    exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
+
+    exportData["10VEHC000000ACXS"] = functions.filtering(
+        table["Forward acceleration"].to_numpy()
+    )
+    exportData["10VEHC000000ACYS"] = functions.filtering(
+        table["Lateral acceleration"].to_numpy()
+    )
+
+    exportData["10VEHC000000AVZP"] = vut_yaw_velocity
+    exportData["10VEHC000000ANZP"] = vut_yaw_angle
+
+    # TODO CHANGE THE CHANNEL NAME TO RANGE B,C POSITION X,Y
+    exportData["11WHEL000000DSXP"] = x_position + B[0] * np.cos(B[1])
+    exportData["11WHEL000000DSYP"] = y_position + B[0] * np.sin(B[1])
+    exportData["13WHEL000000DSXP"] = x_position + C[0] * np.cos(C[1])
+    exportData["13WHEL000000DSYP"] = y_position + C[0] * np.sin(C[1])
 
     sr_velocity = table["SR Velocity"] * np.pi / 180
     sr_angle = table["SR Angle"] * np.pi / 180

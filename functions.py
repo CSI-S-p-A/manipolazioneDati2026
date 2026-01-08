@@ -260,7 +260,7 @@ def reference_system_change_3(yaw_angle, x_position, y_position, x_imu, y_imu):
     N = x_position.shape[0]
     T_imu_ext = np.zeros((N, 3, 3))
 
-    angle = yaw_angle * 0 + 30 * np.pi / 180 + np.pi
+    angle = yaw_angle * 0 + 15 * np.pi / 180 + np.pi
 
     print(f"X posistion: {x_position[0]}")
 
@@ -291,7 +291,7 @@ def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
     import numpy as np
 
     N = x_position.shape[0]
-    angle = yaw_angle * 0 + 30 * np.pi / 180 + np.pi
+    angle = yaw_angle * 0 + 15 * np.pi / 180 + np.pi
 
     # Single transformation matrix: Rotate then Translate
     T = np.zeros((N, 3, 3))
@@ -309,3 +309,40 @@ def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
     T[:, 1, 2] = y_position - (x_imu * np.sin(angle) + y_imu * np.cos(angle))
 
     return T
+
+
+def calculate_B(x_imu, y_imu, width, yaw_angle):
+    import numpy as np
+
+    mod = (x_imu**2 + (width / 2 + y_imu) ** 2) ** 0.5
+    theta = np.arccos(x_imu / mod)
+
+    yaw_total = theta + yaw_angle
+
+    print(f"B: {mod}")
+
+    return (mod, yaw_total)
+
+
+def calculate_A(x_imu, y_imu, overhang, yaw_angle):
+    import numpy as np
+
+    mod = ((x_imu + overhang) ** 2.0 + y_imu**2) ** 0.5
+    theta = np.arccos((x_imu + overhang) / mod)
+
+    yaw_total = theta + yaw_angle
+
+    print(f"A: {mod}")
+    return (mod, yaw_total)
+
+
+def calculate_C(x_imu, y_imu, width, yaw_angle):
+    import numpy as np
+
+    mod = (x_imu**2 + (width / 2 - y_imu) ** 2) ** 0.5
+    theta = 2 * np.pi - np.arccos(x_imu / mod)
+
+    yaw_total = theta + yaw_angle
+    print(f"C: {mod}")
+
+    return (mod, yaw_total)
