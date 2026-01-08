@@ -260,7 +260,7 @@ def reference_system_change_3(yaw_angle, x_position, y_position, x_imu, y_imu):
     N = x_position.shape[0]
     T_imu_ext = np.zeros((N, 3, 3))
 
-    angle = yaw_angle * 0 + 15 * np.pi / 180 + np.pi
+    angle = np.pi + yaw_angle  # * 0 + -30 * np.pi / 180
 
     print(f"X posistion: {x_position[0]}")
 

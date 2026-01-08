@@ -107,7 +107,8 @@ def main():
 
             if currentTestCount == 1:
                 #                plotting.animation_3_points(
-                plotting.animate_car_frame(
+                # plotting.animate_car_frame(
+                plotting.animation_car_points(
                     exportData["10VEHC000000DSXP"],
                     exportData["10VEHC000000DSYP"],
                     exportData["11WHEL000000DSXP"],
@@ -396,7 +397,8 @@ def targetProcess(table, exportData, testType):
         TestType.C2PC: "PEDC",
     }
 
-    test = []
+    test = None
+
     for t in testType:
         if t in TARGET_CODE:
             test = t
@@ -407,23 +409,23 @@ def targetProcess(table, exportData, testType):
 
     # TODO CHANGE THE SYSTEM OF REFERENCE IF NEEDED
 
-    exportData[f"20{TARGET_CODE[testType]}000000DSXP"] = table[
+    exportData[f"20{TARGET_CODE[test]}000000DSXP"] = table[
         "Target reference X position"
     ].to_numpy()
 
-    exportData[f"20{TARGET_CODE[testType]}000000DSYP"] = table[
+    exportData[f"20{TARGET_CODE[test]}000000DSYP"] = table[
         "Target reference Y position"
     ].to_numpy()
 
-    exportData[f"20{TARGET_CODE[testType]}000000VEXP"] = table[
+    exportData[f"20{TARGET_CODE[test]}000000VEXP"] = table[
         "Target forward velocity"
     ].to_numpy()
 
-    exportData[f"20{TARGET_CODE[testType]}000000VEYP"] = table[
+    exportData[f"20{TARGET_CODE[test]}000000VEYP"] = table[
         "Target lateral velocity"
     ].to_numpy()
 
-    exportData[f"20{TARGET_CODE[testType]}000000ACXS"] = functions.filtering(
+    exportData[f"20{TARGET_CODE[test]}000000ACXS"] = functions.filtering(
         table["Target forward acceleration"].to_numpy()
     )
 
@@ -433,8 +435,8 @@ def targetProcess(table, exportData, testType):
         functions.filtering(table["Target yaw velocity"].to_numpy()) * np.pi / 180
     )
 
-    exportData[f"20{TARGET_CODE[testType]}000000ANZS"] = target_yaw
-    exportData[f"20{TARGET_CODE[testType]}000000AVZP"] = target_yaw_velocity
+    exportData[f"20{TARGET_CODE[test]}000000ANZS"] = target_yaw
+    exportData[f"20{TARGET_CODE[test]}000000AVZP"] = target_yaw_velocity
 
 
 if __name__ == "__main__":
