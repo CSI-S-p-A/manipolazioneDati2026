@@ -10,25 +10,30 @@ from test_checks import TestType
 
 
 def main():
+
     sourceFolder = functions.getFolder()
     if not sourceFolder:
         return
 
+    # Copying the folder content and placing the "_manipulated" suffix
     parentFolder = os.path.dirname(sourceFolder)
     folderName = os.path.basename(sourceFolder)
     manipulatedFolderName = folderName + "_manipulated"
-
     print("Copying files...")
     manipulatedFolder = os.path.join(parentFolder, manipulatedFolderName)
     shutil.copytree(sourceFolder, manipulatedFolder, dirs_exist_ok=True)
     print("All files have been copied.\n")
 
+    # os.walk scans recursevely all the files and folders in the directory
+    # This first cycle removes the CurrentTestSpec.txt
     for root, dirs, files in os.walk(manipulatedFolder, topdown=False):
         for file in files:
             if file.endswith(".txt") and "Current" in file:
                 fullPath = os.path.join(root, file)
                 os.remove(fullPath)
 
+    # This second cycle checks all the files and appends to a list all
+    # the .txt files
     txtFiles: list[str] = []
     for root, dirs, files in os.walk(manipulatedFolder):
         for file in files:
@@ -37,37 +42,57 @@ def main():
                 txtFiles.append(fullPath)
 
     nTests = len(txtFiles)
+
+    # Initialization of the list of all the tests that were not processed correctly with also
+    # the error that made them not go through
     failedFiles: list[tuple[str, Exception]] = []
     currentTestCount = 0
 
+    # This loads the Pandas library, i've placed it here because the startup time on
+    # the remote desktop was too high so I've distrubuted the loading time of the app
     pd = functions.loadPandas()
     print("Found", nTests, "test files to process.")
 
+
+    # Start of the main loop that process every test
     for test in txtFiles:
         currentTestCount += 1
         folderTest = os.path.dirname(test)
         relativePath = test.replace(manipulatedFolder, "")
 
+        # If the .txt is not a test, skip to the next .txt file
         if not functions.testCheck(test):
             print(relativePath + " was not a test.")
             os.remove(test)
             continue
 
+        # Try/Except, if there is an error inside the "try:"
+        # the program doesn't crash but it goes to the "except:" block below
         try:
+
+            # Opening the content of the file in "fileContent"
             with open(test, "r") as file:
                 fileContent = file.readlines()
 
+            # Parsing the header of the file, getting the number of data points
+            # from the second line of the file that is like: "Points=XXXX"
             descriptionLines = fileContent[:2]
             numberDataRows = int(descriptionLines[1].split("=")[1].strip())
+
             totalLines = len(fileContent)
             unitsOfMeasure = fileContent[3]
 
             headerLines = descriptionLines
             headerLines.append(unitsOfMeasure)
 
+            # The file contains the header and also some junk at the end,
+            # this vector lists the lines that need to be skipped and passes it as "skiprows"
+            # to the "read_csv" function of Pandas (pd)
             rowsSkipped = [0, 1, 3] + list(range(4 + numberDataRows, totalLines))
 
             data = StringIO("".join(fileContent))
+
+            # Loading the data in to a table
             table = pd.read_csv(
                 data,
                 skiprows=rowsSkipped,
@@ -77,19 +102,24 @@ def main():
                 dtype=float,
             )
 
+            # This is needed to rename the "ADC6" if SOMEONE forget and left it as
+            # BR Analogue or whatever
+            # This finds "ADC5" and renames the column next to it, if it doesnt find ADC5
+            # because that is also with another name, i'm sorry this was the best i could do
             index_ADC5 = table.columns.get_loc("ADC5")
             if type(index_ADC5) is int:
                 table.rename(
                     columns={table.columns[index_ADC5 + 1]: "ADC6"}, inplace=True
                 )
 
-            if currentTestCount == 20:
-                print(table.columns.values)
-
+            # Checks the type of the test
+            testType = []
             testType = test_checks.testCheck(test)
 
             dataTime = table["Time"].copy()
 
+            # This finds the "startTestIndex" that for AEB tests where TTC is roughtly 4
+            # I couldn't find a similar criteria for LSS tests so for now is just = 500
             if test_checks.TestType.LSS not in testType:
                 dataTTC = table["Time to collision (longitudinal)"]
                 [newTime, startTestIndex] = functions.TTCProcess(dataTTC, dataTime)
@@ -98,14 +128,18 @@ def main():
                 # LSS from different sources, like the steering and the current position on the path
                 startTestIndex = 500
 
-            # Filling the channels
+            # Initializing the python dictionary with the data to be export
             exportData = {}
+
+            # As seen in the CA004 the three main informations that needs to be encoded in the
+            # chanell files are relative to the Time, the VUT (like speed/position/state of the pedals)
+            # and Target.
             timeProcess(table, exportData, startTestIndex, testType, test)
             VUTProcess(table, exportData, testType, folderTest)
+            targetProcess(table, exportData, testType)
 
-            print(exportData["10VEHC000000DSXP"])
-
-            if currentTestCount == 1:
+            # Just the animation plot for debug sake
+            if currentTestCount == 6:
                 #                plotting.animation_3_points(
                 # plotting.animate_car_frame(
                 plotting.animation_car_points(
@@ -119,7 +153,6 @@ def main():
                     table["Y position"].to_numpy(),
                 )
 
-            targetProcess(table, exportData, testType)
 
             # Outputing the data to the channel files
             functions.exportingToChannelFolder(folderTest, exportData)
@@ -130,6 +163,8 @@ def main():
             print(formattedPercentage, "\t", relativePath, " was processed.")
 
         except Exception as e:
+            # If something failed in the process the script goes to the next test and saves
+            # the test in the "failedFiles" list
             failedFiles.append((relativePath, e))
             errorMessage = "There was an error: " + str(e) + "\n"
             errorMessage = errorMessage + relativePath + " was NOT processed"
@@ -141,6 +176,8 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
         exportData["10TFCW000000EV00"] = functions.warningProcess(
             table["ADC6"], startTestIndex
         )
+
+    elif TestType.DOOR not in testType:
         exportData["10TECS000000EV00"] = functions.yawVelocityProcess(
             table["Yaw velocity"], startTestIndex
         )
@@ -149,11 +186,14 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
         exportData["10TWRN000000EV00"] = functions.warningProcess(
             table["ADC6"], startTestIndex
         )
+
         # I've assumed the ADC7 for the external trigger for the door opening, just use a reference one
         exportData["10TDOP000000EV00"] = functions.warningProcess(
             table["ADC7"], startTestIndex
         )
+
         testFolder = os.path.dirname(test)
+
         visualFile = os.path.join(testFolder, "visual.ini")
         if os.path.exists(visualFile):
             with open(visualFile, "r") as file:
@@ -295,6 +335,22 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["10PEBR000000FO0P"] = table["Brake force (unfiltered)"].to_numpy()
 
 
+    visualFile = os.path.join(folderTest, "turning_indicator.ini")
+    if os.path.exists(visualFile):
+        with open(visualFile, "r") as file:
+            indicatorValue = file.readline()
+        indicatorValue = float(indicatorValue)
+        print(f"turning_indicator.ini was found, the value is: {indicatorValue}")
+        exportData["110TURN000000EV00"] = functions.externalTimeProcess(
+            indicatorValue, table
+        )
+    else:
+        exportData["10TURN000000EV00"] = table["Time"].copy().to_numpy() * 0
+        functions.decorateSentence(
+            "Warning: no turning_indicator.ini file found. The vector will be all zeros.",
+            False,
+        )
+
 def VUTProcess_2(table, exportData, testType: List[TestType], folderTest):
     import numpy as np
 
@@ -387,7 +443,6 @@ def VUTProcess_2(table, exportData, testType: List[TestType], folderTest):
 def targetProcess(table, exportData, testType):
     import numpy as np
 
-    # TODO CHANGE THE LSS PROCESS
     TARGET_CODE = {
         TestType.C2C: "VEHC",
         TestType.C2M: "TWMB",
