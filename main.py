@@ -10,7 +10,6 @@ from test_checks import TestType
 
 
 def main():
-
     sourceFolder = functions.getFolder()
     if not sourceFolder:
         return
@@ -53,7 +52,6 @@ def main():
     pd = functions.loadPandas()
     print("Found", nTests, "test files to process.")
 
-
     # Start of the main loop that process every test
     for test in txtFiles:
         currentTestCount += 1
@@ -69,7 +67,6 @@ def main():
         # Try/Except, if there is an error inside the "try:"
         # the program doesn't crash but it goes to the "except:" block below
         try:
-
             # Opening the content of the file in "fileContent"
             with open(test, "r") as file:
                 fileContent = file.readlines()
@@ -153,7 +150,6 @@ def main():
                     table["Y position"].to_numpy(),
                 )
 
-
             # Outputing the data to the channel files
             functions.exportingToChannelFolder(folderTest, exportData)
 
@@ -227,14 +223,11 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
             )
 
 
-# KEEP FIXING THIS PLEASE
 def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     import numpy as np
 
-    # START VUT PROCESS
-    #
-    # TODO CHANGE THE CHANNEL NAME CHANGE IT TO RANGE_A X POSITION OR WHATEVER
-    # TODO ALL THE POSITIONS SHOULD BE ADJUSTED FOR THE CORRECT FRAME OF REFERENCE
+    # TODO: add a way to import the dimensions dynamically (like from user input or from the .ini file)
+
     offsetX = 0
     offsetY = 0
 
@@ -243,7 +236,7 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     x_imu = 3
     y_imu = 0.1
 
-    # THIS IS NOT RIGHT WITH THE NORMAL ZERO, YOU HAVE TO SWTICH BETWEEN GETTING THE ZERO FROM THE NORMAL X AND THE RANGE B OR C POINT
+    # TODO: decide if the offset is going to be defined in the motion pack or if you need to calculate it after
     for t in testType:
         match t:
             case TestType.LSS:
@@ -334,7 +327,6 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
 
     exportData["10PEBR000000FO0P"] = table["Brake force (unfiltered)"].to_numpy()
 
-
     visualFile = os.path.join(folderTest, "turning_indicator.ini")
     if os.path.exists(visualFile):
         with open(visualFile, "r") as file:
@@ -350,6 +342,7 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
             "Warning: no turning_indicator.ini file found. The vector will be all zeros.",
             False,
         )
+
 
 def VUTProcess_2(table, exportData, testType: List[TestType], folderTest):
     import numpy as np
