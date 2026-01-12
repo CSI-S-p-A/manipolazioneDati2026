@@ -19,12 +19,15 @@ def getFolder():
     return sourceFolder
 
 
+# Function to load Pandas
 def loadPandas():
     import pandas as pd
 
     return pd
 
 
+# Function to check if the .txt file is actually a test
+# it checks if there is a .spec file in the same folder
 def testCheck(test: str) -> bool:
     specPath = test.replace(".txt", ".spec")
     return os.path.exists(specPath)
@@ -103,6 +106,7 @@ def TTCProcess(TTCVector, timeVector):
     return (newTime, startTestIndex)
 
 
+# Filtering the data
 def filtering(dataVector):
     from scipy import signal
 
@@ -110,12 +114,15 @@ def filtering(dataVector):
     return signal.sosfiltfilt(sos, dataVector)
 
 
+# Processing the ADC6 data
 def warningProcess(warningVector, startTestIndex):
     warningOut = warningVector.copy()
     warningOut[:] = 0
 
     warningThreshold = 1
 
+    # Deriving the warning and chack when the derivative is more than 1
+    # this comes from the old processing in Matlab
     dY = warningVector.diff()
     dY[0] = dY[1]
     dY = dY.abs()
@@ -129,6 +136,7 @@ def warningProcess(warningVector, startTestIndex):
     return warningOut
 
 
+# Similar process as the warning but with the yaw velocity
 def yawVelocityProcess(yawVelocity, startTestIndex):
     import pandas as pd
 
@@ -142,17 +150,14 @@ def yawVelocityProcess(yawVelocity, startTestIndex):
         yawVelocityPositive.iloc[startTestIndex:] > warningThreshold
     ].index.tolist()
 
-    print(len(indexFirstWarning))
-
-    print("first print")
-    print(indexFirstWarning)
-
     if len(indexFirstWarning) != 0:
         curveTime[indexFirstWarning[0] :] = 5
 
     return curveTime.to_numpy()
 
 
+# Covert the BR Position to the accellerator position
+# the negative values of the brake are the values of the accelerator
 def processAcceleratorPosition(dataVector):
     import numpy as np
 
@@ -161,6 +166,7 @@ def processAcceleratorPosition(dataVector):
     return np.abs(dataVector)
 
 
+# Removes the negative value in the BR Position
 def processBrakePosition(dataVector):
     import numpy as np
 
@@ -169,9 +175,12 @@ def processBrakePosition(dataVector):
     return np.abs(dataVector)
 
 
+# Managing the final export
+# TODO adding the header to the channel when ENCAP defines what it wants
 def exportingToChannelFolder(testDirectory, output):
     import numpy as np
 
+    # Creating the Channel folder
     channelFolder = os.path.join(testDirectory, "Channel")
     os.makedirs(channelFolder, exist_ok=True)
     numberOfChannels = len(output)
@@ -182,8 +191,7 @@ def exportingToChannelFolder(testDirectory, output):
         file.write("Instrumentation standard    :ISO 6487 :1987\n")
         file.write("Number of channels          :" + str(numberOfChannels) + "\n")
 
-    # print(output)
-
+    # Saving to the info in the .chn file
     for channelName, dataVector in output.items():
         currentChannelNumber = str(count).zfill(3)
 
@@ -196,6 +204,7 @@ def exportingToChannelFolder(testDirectory, output):
                 + "\n"
             )
 
+        # Saving to every .01 files
         np.savetxt(
             os.path.join(channelFolder, "data." + currentChannelNumber),
             dataVector,
@@ -205,19 +214,55 @@ def exportingToChannelFolder(testDirectory, output):
         count = count + 1
 
 
+# Generic function that creates the data from and external time file (like ldw.ini or visual.ini)
 def externalTimeProcess(timeValue, table):
     import numpy as np
 
     outputVector = table["Time"].copy()
     outputVector[:] = 0
 
+    # Finds the closest time value to the one in the file
     idx = np.abs(table["Time"].to_numpy() - timeValue).argmin()
 
     outputVector[idx:] = 5
     return outputVector.to_numpy()
 
 
+# Function to create the linear transformation matrix to the VUT
+# reference system to the external one
 def reference_system_change(yaw_angle, x_position, y_position, x_imu, y_imu):
+    import numpy as np
+
+    N = x_position.shape[0]
+    T_imu_ext = np.zeros((N, 3, 3))
+
+    angle = np.pi + yaw_angle
+
+    T_imu_ext[:, 0, 0] = np.cos(angle)
+    T_imu_ext[:, 0, 1] = -np.sin(angle)
+    T_imu_ext[:, 1, 0] = np.sin(angle)
+    T_imu_ext[:, 1, 1] = np.cos(angle)
+
+    T_imu_ext[:, 0, 2] = x_position
+    T_imu_ext[:, 1, 2] = y_position
+    T_imu_ext[:, 2, 2] = 1
+
+    T_vut_imu = np.zeros((N, 3, 3))
+
+    T_vut_imu[:, 0, 0] = 1
+    T_vut_imu[:, 1, 1] = 1
+    T_vut_imu[:, 2, 2] = 1
+
+    T_vut_imu[:, 0, 2] = -x_imu
+    T_vut_imu[:, 1, 2] = -y_imu
+
+    T = T_imu_ext @ T_vut_imu
+
+    return T
+
+
+#######################################################################################################################################
+def reference_system_change_old(yaw_angle, x_position, y_position, x_imu, y_imu):
     import numpy as np
 
     N = x_position.shape[0]
@@ -249,62 +294,6 @@ def reference_system_change(yaw_angle, x_position, y_position, x_imu, y_imu):
     T_vut_imu[:, 1, 2] = -y_imu
 
     T = T_imupar_ext @ T_imu_imupar @ T_vut_imu
-    # T = T_imupar_ext @ T_vut_imu
-
-    return T
-
-
-def reference_system_change_3(yaw_angle, x_position, y_position, x_imu, y_imu):
-    import numpy as np
-
-    N = x_position.shape[0]
-    T_imu_ext = np.zeros((N, 3, 3))
-
-    angle = np.pi + yaw_angle  # * 0 + -30 * np.pi / 180
-
-    T_imu_ext[:, 0, 0] = np.cos(angle)
-    T_imu_ext[:, 0, 1] = -np.sin(angle)
-    T_imu_ext[:, 1, 0] = np.sin(angle)
-    T_imu_ext[:, 1, 1] = np.cos(angle)
-
-    T_imu_ext[:, 0, 2] = x_position
-    T_imu_ext[:, 1, 2] = y_position
-    T_imu_ext[:, 2, 2] = 1
-
-    T_vut_imu = np.zeros((N, 3, 3))
-
-    T_vut_imu[:, 0, 0] = 1
-    T_vut_imu[:, 1, 1] = 1
-    T_vut_imu[:, 2, 2] = 1
-
-    T_vut_imu[:, 0, 2] = -x_imu
-    T_vut_imu[:, 1, 2] = -y_imu
-
-    T = T_imu_ext @ T_vut_imu
-
-    return T
-
-
-def reference_system_change_2(yaw_angle, x_position, y_position, x_imu, y_imu):
-    import numpy as np
-
-    N = x_position.shape[0]
-    angle = yaw_angle * 0 + 15 * np.pi / 180 + np.pi
-
-    # Single transformation matrix: Rotate then Translate
-    T = np.zeros((N, 3, 3))
-
-    # Rotation part
-    T[:, 0, 0] = np.cos(angle)
-    T[:, 0, 1] = -np.sin(angle)
-    T[:, 1, 0] = np.sin(angle)
-    T[:, 1, 1] = np.cos(angle)
-    T[:, 2, 2] = 1
-
-    # Translation part:
-    # external_position - rotated_IMU_offset
-    T[:, 0, 2] = x_position - (x_imu * np.cos(angle) - y_imu * np.sin(angle))
-    T[:, 1, 2] = y_position - (x_imu * np.sin(angle) + y_imu * np.cos(angle))
 
     return T
 
