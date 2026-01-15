@@ -10,6 +10,22 @@ from test_checks import TestType
 
 
 def main():
+    print("Enter the overhang:")
+    overhang = float(input())
+
+    print("Enter the car width:")
+    width = float(input())
+
+    imu_coord = []
+
+    print("Enter xIMU:")
+    imu_coord.append(float(input()))
+
+    print(
+        "Enter yIMU:\n(watching the front of the car, left is positive, right is negative):"
+    )
+    imu_coord.append(float(input()))
+
     sourceFolder = functions.getFolder()
     if not sourceFolder:
         return
@@ -132,7 +148,9 @@ def main():
             # chanell files are relative to the Time, the VUT (like speed/position/state of the pedals)
             # and Target.
             timeProcess(table, exportData, startTestIndex, testType, test)
-            VUTProcess(table, exportData, testType, folderTest)
+            VUTProcess(
+                table, exportData, testType, folderTest, overhang, width, imu_coord
+            )
             targetProcess(table, exportData, testType)
 
             # Just the animation plot for debug sake, if you need it just place the test number you want to check instad of "-1"
@@ -232,18 +250,16 @@ def timeProcess(table, exportData, startTestIndex, testType, test):
 
 
 # Function that insert the VUT data in the exportData dictionary
-def VUTProcess(table, exportData, testType: List[TestType], folderTest):
+def VUTProcess(
+    table, exportData, testType: List[TestType], folderTest, overhang, width, imu_coord
+):
     import numpy as np
-
-    # TODO: add a way to import the dimensions dynamically (like from user input or from the .ini file)
 
     offsetX = 0
     offsetY = 0
 
-    overhang = 2
-    width = 2
-    x_imu = 3
-    y_imu = 0.1
+    x_imu = imu_coord[0]
+    y_imu = imu_coord[1]
 
     # TODO: decide if the offset is going to be defined in the motion pack or if you need to calculate it after
 
@@ -263,9 +279,8 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
                 offsetY = 0.0
 
     # Filtering the yaw velocity
-    vut_yaw_velocity = (
-        functions.filtering(table["Yaw velocity"].to_numpy()) * np.pi / 180
-    )
+    vut_yaw_velocity = table["Yaw velocity"].to_numpy() * np.pi / 180
+
     vut_yaw_angle = table["Yaw angle"].to_numpy() * np.pi / 180
 
     x_position = table["X position"].to_numpy()
@@ -293,12 +308,8 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["10VEHC000000VEXP"] = table["Forward velocity"].to_numpy()
     exportData["10VEHC000000VEYP"] = table["Lateral velocity"].to_numpy()
 
-    exportData["10VEHC000000ACXS"] = functions.filtering(
-        table["Forward acceleration"].to_numpy()
-    )
-    exportData["10VEHC000000ACYS"] = functions.filtering(
-        table["Lateral acceleration"].to_numpy()
-    )
+    exportData["10VEHC000000ACXS"] = table["Forward acceleration"].to_numpy()
+    exportData["10VEHC000000ACYS"] = table["Lateral acceleration"].to_numpy()
 
     exportData["10VEHC000000AVZP"] = vut_yaw_velocity
     exportData["10VEHC000000ANZP"] = vut_yaw_angle
@@ -314,9 +325,7 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     exportData["10STWL000000AV1P"] = sr_velocity
     exportData["10STWL000000AN1P"] = sr_angle
 
-    exportData["10STWL000000MO1P"] = functions.filtering(
-        table["SR Column Torque (Estimated)"].to_numpy()
-    )
+    exportData["10STWL000000MO1P"] = table["SR Column Torque (Estimated)"].to_numpy()
 
     exportData["10PEAC000000DS0P"] = functions.processAcceleratorPosition(
         table["BR Position"].to_numpy()
@@ -331,19 +340,19 @@ def VUTProcess(table, exportData, testType: List[TestType], folderTest):
     # TODO: encap wants to have the time in which the turning light is pressed, right
     # now is asking for it at every test, it only needs it for TAP and Overtaking, so make it ask just for
     # that type of test
-    visualFile = os.path.join(folderTest, "turning_indicator.ini")
-    if os.path.exists(visualFile):
-        with open(visualFile, "r") as file:
-            indicatorValue = file.readline()
-        indicatorValue = float(indicatorValue)
-        print(f"turning_indicator.ini was found, the value is: {indicatorValue}")
+    turnSignalFile = os.path.join(folderTest, "turn_signal.ini")
+    if os.path.exists(turnSignalFile):
+        with open(turnSignalFile, "r") as file:
+            signalValue = file.readline()
+        signalValue = float(signalValue)
+        print(f"turn_signal.ini was found, the value is: {signalValue}")
         exportData["110TURN000000EV00"] = functions.externalTimeProcess(
-            indicatorValue, table
+            signalValue, table
         )
     else:
         exportData["10TURN000000EV00"] = table["Time"].copy().to_numpy() * 0
         functions.decorateSentence(
-            "Warning: no turning_indicator.ini file found. The vector will be all zeros.",
+            "Warning: no turn_signal.ini file found. The vector will be all zeros.",
             False,
         )
 
@@ -394,15 +403,13 @@ def targetProcess(table, exportData, testType):
         "Target lateral velocity"
     ].to_numpy()
 
-    exportData[f"20{TARGET_CODE[test]}000000ACXS"] = functions.filtering(
-        table["Target forward acceleration"].to_numpy()
-    )
+    exportData[f"20{TARGET_CODE[test]}000000ACXS"] = table[
+        "Target forward acceleration"
+    ].to_numpy()
 
-    # Convert Yaw to rad
+    # Convert yaw and yaw velocity to rad
     target_yaw = table["Target yaw"].to_numpy() * np.pi / 180
-    target_yaw_velocity = (
-        functions.filtering(table["Target yaw velocity"].to_numpy()) * np.pi / 180
-    )
+    target_yaw_velocity = table["Target yaw velocity"].to_numpy() * np.pi / 180
 
     exportData[f"20{TARGET_CODE[test]}000000ANZS"] = target_yaw
     exportData[f"20{TARGET_CODE[test]}000000AVZP"] = target_yaw_velocity

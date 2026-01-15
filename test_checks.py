@@ -21,7 +21,7 @@ def testCheck(test: str) -> List[TestType]:
     matches = []
 
     # Associate the identifiers with the test types
-    # TODO add a "needs the turning indicator" type to Overtaking and TAP
+    # TODO add a "needs the turning indicator" type for Overtaking and TAP
     IDENTIFIERS = {
         TestType.LSS: ("LKA", "ELK", "LDW"),  # Update with the new LSS
         TestType.C2C: (
@@ -31,8 +31,8 @@ def testCheck(test: str) -> List[TestType]:
             "CCFhos",
             "CCFtap",
             "CCC",
-            "VUT",
             "Overtaking",
+            "GVT",
         ),
         TestType.C2M: ("CMRs", "CMRb", "CMF", "CMC", "EMT", "CMO"),
         TestType.C2B: ("CBNA", "CBFA", "CBNAO", "CBLA", "CBTA"),
@@ -48,7 +48,7 @@ def testCheck(test: str) -> List[TestType]:
     # the match can work also for more that one word
     for testType, identifers in IDENTIFIERS.items():
         if any(i in descriptionLine for i in identifers):
-            print(testType)
+            print(f"\n{testType}")
             matches.append(testType)
 
     if matches:
